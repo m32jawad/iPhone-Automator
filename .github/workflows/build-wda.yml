@@ -1,0 +1,50 @@
+name: Build WebDriverAgent (.ipa)
+
+# Builds a WebDriverAgent app on GitHub's free macOS runners and uploads it as an
+# artifact. You then download that .ipa and sign + install it onto your iPhone from
+# Windows with Sideloadly (no Mac needed for signing).
+#
+# Trigger it manually from the GitHub "Actions" tab -> "Build WebDriverAgent" -> "Run workflow".
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout WebDriverAgent
+        uses: actions/checkout@v4
+        with:
+          repository: appium/WebDriverAgent
+          ref: master
+
+      - name: Build WebDriverAgentRunner (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project WebDriverAgent.xcodeproj \
+            -scheme WebDriverAgentRunner \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            | xcbeautify || true
+
+      - name: Package .app into an unsigned .ipa
+        run: |
+          # Find the runner app that xcodebuild produced.
+          APP_PATH=$(find ./build -name "WebDriverAgentRunner-Runner.app" -type d | head -n 1)
+          echo "Found: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then echo "::error::Runner app not found"; exit 1; fi
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r WebDriverAgent.ipa Payload > /dev/null
+          echo "Created WebDriverAgent.ipa"
+
+      - name: Upload the .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebDriverAgent-ipa
+          path: WebDriverAgent.ipa
+          if-no-files-found: error
