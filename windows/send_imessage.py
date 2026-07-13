@@ -11,6 +11,7 @@ here has a comment marking what to check.
 
 from __future__ import annotations
 
+import os
 import time
 from appium import webdriver
 from appium.options.ios import XCUITestOptions
@@ -18,10 +19,12 @@ from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- connection settings (edit these) ----------------------------------------
-APPIUM_SERVER = "http://127.0.0.1:4723"
-WDA_URL = "http://127.0.0.1:8100"          # the WDA port you forwarded with tidevice
-IPHONE_UDID = "YOUR_IPHONE_UDID"           # from: tidevice list
+# --- connection settings (read from environment; start-gateway.ps1 sets these) ---
+# You normally don't edit these by hand — start-gateway.ps1 auto-detects the UDID
+# and exports it. They only fall back to defaults for manual runs.
+APPIUM_SERVER = os.environ.get("APPIUM_SERVER", "http://127.0.0.1:4723")
+WDA_URL = os.environ.get("WDA_URL", "http://127.0.0.1:8100")
+IPHONE_UDID = os.environ.get("IPHONE_UDID", "")   # auto-detected: tidevice list --usb --one
 MESSAGES_BUNDLE_ID = "com.apple.MobileSMS"
 
 # --- selectors to verify in Appium Inspector if a step fails ------------------
@@ -32,6 +35,12 @@ SEND_BTN = "Send"                           # the up-arrow send button
 
 
 def _make_driver() -> webdriver.Remote:
+    if not IPHONE_UDID:
+        raise RuntimeError(
+            "No iPhone UDID set. Start the stack with start-gateway.ps1 (it auto-detects "
+            "the device), or set the IPHONE_UDID environment variable manually "
+            "(find it with: tidevice list)."
+        )
     opts = XCUITestOptions()
     opts.platform_name = "iOS"
     opts.automation_name = "XCUITest"
