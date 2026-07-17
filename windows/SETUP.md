@@ -57,22 +57,38 @@ That's everything on the phone. The scrolling/typing/sending is all automated la
 
 ## ③ The Windows PC
 
-### 3a. One command installs almost everything
+### 3a. One command installs everything
 
-Open **PowerShell**, then:
+Straight after `git clone`, open **PowerShell** in the repo root:
 
 ```powershell
-cd <path-to-repo>\windows
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
 
-`setup.ps1` installs **Node.js, Python, iTunes (Apple drivers), Appium + iOS driver, and
-the Python packages** — using `winget` (built into Windows 11). Click **Yes** on any UAC
-prompt. **Reboot when it finishes** (iTunes needs it).
+That installs **Node.js, Python, iTunes (Apple drivers), Appium + the iOS driver, and the
+Python packages** using `winget` (built into Windows 11), then **verifies each one** and
+prints a summary table. Click **Yes** on any UAC prompt.
+
+It's **safe to re-run** — anything already installed is skipped. Useful flags:
+
+| Flag | Does |
+|---|---|
+| `-VerifyOnly` | Check what's installed, change nothing. Run this after a reboot to confirm you're good. |
+| `-SkipITunes` | Leave iTunes alone (the Apple drivers are already working). |
+| `-SkipSideloadly` | Don't open the Sideloadly download page. |
+
+Notes:
+- The Python packages go into a **virtual environment at `windows\.venv`**, not your
+  system Python — nothing else on the PC is touched. `start-gateway.ps1` finds it
+  automatically, so there's no "activate" step.
+- **Reboot when it finishes** if it says so — the Apple USB drivers only register after a
+  restart. Then run `.\setup.ps1 -VerifyOnly` and confirm every row says `OK`.
+- If a fresh PowerShell says `appium` isn't recognised, just **open a new window** — the
+  PATH change only applies to new shells.
 
 ### 3b. Install Sideloadly (one manual download)
 
-`winget` doesn't carry Sideloadly, so grab it once:
+`winget` doesn't carry Sideloadly, so grab it once (setup.ps1 opens this page for you):
 - Download + install from **https://sideloadly.io**
 - (Now go do step ② — install WDA on the phone — if you skipped it.)
 
@@ -107,20 +123,25 @@ To reach it over the internet, tunnel it: `ngrok http 5000` gives a public URL.
 
 ## Manual mode (if you prefer separate terminals over start-gateway.ps1)
 
+`tidevice` and `python` live in the venv, so call them from `.venv\Scripts\` — or run
+`.\.venv\Scripts\Activate.ps1` once per terminal and then use the bare names.
+
 ```powershell
+cd <path-to-repo>\windows
+
 # find the UDID
-tidevice list
+.\.venv\Scripts\tidevice.exe list
 
 # Terminal A — WDA on the phone + port forward
-tidevice wdaproxy -B com.facebook.WebDriverAgentRunner.xctrunner --port 8100
+.\.venv\Scripts\tidevice.exe wdaproxy -B com.facebook.WebDriverAgentRunner.xctrunner --port 8100
 
-# Terminal B — Appium
+# Terminal B — Appium (this one IS global)
 appium
 
 # Terminal C — the gateway (set the phone id + secret first)
 $env:IPHONE_UDID = "<udid from tidevice list>"
 $env:API_KEY = "pick-a-secret"
-python server.py
+.\.venv\Scripts\python.exe server.py
 ```
 
 ---
@@ -129,9 +150,15 @@ python server.py
 
 | Symptom | Cause / fix |
 |---|---|
+| **Anything at all seems missing** | Run `.\setup.ps1 -VerifyOnly` — it prints a table of exactly what's `OK` vs `MISSING`. |
+| `winget not found` | Update **App Installer** in the Microsoft Store, then open a new PowerShell. |
+| `The Python environment is missing` | The venv wasn't built → run `.\setup.ps1` and check the "Python packages" row. |
+| `appium is not recognized` | PATH only updates for **new** shells → close PowerShell, open a fresh one. |
+| Python install "worked" but pip fails | You're on the Microsoft Store's fake `python.exe` stub. `setup.ps1` skips it and installs a real Python — re-run it, then open a new shell. |
+| `running scripts is disabled on this system` | Launch with `powershell -ExecutionPolicy Bypass -File .\setup.ps1` (as documented above). |
 | `socket connect error` / port 27015 | Apple driver missing → install iTunes, **reboot** |
 | `port 4723 refused` | Appium server not running → open a terminal and run `appium` |
-| `tidevice list` shows nothing | Cable/trust issue → replug, tap **Trust**, use a data cable |
+| `tidevice list` shows nothing | Cable/trust issue → replug, tap **Trust**, use a **data** cable (not charge-only) |
 | WDA window errors on launch | Re-open the WDA app via Sideloadly; on **iOS 17+**, tidevice can be flaky — tell me and I'll switch you to `go-ios`/`pymobiledevice3` |
 | App "expires" after ~7 days | Free Apple ID limit → re-run Sideloadly, or use a paid dev account |
 | A tap fails (compose/send button) | Messages' labels vary by iOS version → open **Appium Inspector**, read the real element `name`, update the matching constant in `send_imessage.py` |
@@ -141,5 +168,5 @@ python server.py
 | Device | Installed |
 |---|---|
 | **iPhone** | WebDriverAgent (only this) |
-| **Windows** | Node, Python, iTunes drivers, Appium + iOS driver, tidevice, this repo |
+| **Windows** | Node + Appium/XCUITest (global), Python + iTunes drivers, and Flask/Appium-client/tidevice inside `windows\.venv` |
 | **GitHub** | builds `WebDriverAgent.ipa` (cloud Macs) |

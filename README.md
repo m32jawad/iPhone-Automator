@@ -18,17 +18,25 @@ signed/installed from Windows with Sideloadly.
 Everything is in one guide: **[windows/SETUP.md](windows/SETUP.md)**. Short version:
 
 1. **GitHub** → Actions tab → run **Build WebDriverAgent** → download `WebDriverAgent.ipa`.
-2. **Windows** → `powershell -ExecutionPolicy Bypass -File .\setup.ps1` (installs Node,
-   Python, iTunes drivers, Appium, packages). Also install **Sideloadly** from sideloadly.io.
+2. **Windows** → clone the repo, then from the repo root:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\setup.ps1
+   ```
+   Installs + verifies Node, Python, iTunes drivers, Appium + the iOS driver, and the
+   Python packages, then prints a table of what's `OK`. Re-runnable; reboot if it asks.
+   It also opens the **Sideloadly** download page (the one thing winget can't install).
 3. **iPhone** → Sideloadly installs `WebDriverAgent.ipa`; trust it + enable Developer Mode.
-4. **Run** → `.\start-gateway.ps1 -ApiKey "secret"` → open **http://localhost:5000**.
+4. **Run** → `cd windows` → `.\start-gateway.ps1 -ApiKey "secret"` → open **http://localhost:5000**.
+
+Stuck? `.\setup.ps1 -VerifyOnly` tells you exactly what's missing.
 
 ## What's in the repo
 
 | Path | What it is |
 |---|---|
 | [.github/workflows/build-wda.yml](.github/workflows/build-wda.yml) | Cloud build of WebDriverAgent → downloadable `.ipa` |
-| [windows/setup.ps1](windows/setup.ps1) | One-shot installer (Node, Python, iTunes, Appium, deps) |
+| [setup.ps1](setup.ps1) | **Start here** — run after cloning; forwards to the installer below |
+| [windows/setup.ps1](windows/setup.ps1) | The real installer: Node, Python, iTunes, Appium + iOS driver, venv, and verification |
 | [windows/start-gateway.ps1](windows/start-gateway.ps1) | Auto-detects the iPhone and launches all 3 services |
 | [windows/server.py](windows/server.py) | Flask web UI + `POST /send` |
 | [windows/send_imessage.py](windows/send_imessage.py) | Appium flow: open Messages → recipient → type → Send |

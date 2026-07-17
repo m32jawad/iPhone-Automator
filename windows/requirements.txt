@@ -1,3 +1,5 @@
+# Installed into windows\.venv by setup.ps1 — not globally.
+# Needs Python 3.9-3.13.
 Appium-Python-Client>=4.0.0
 Flask>=3.0.0
 tidevice>=0.12.0
