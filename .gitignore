@@ -1,5 +1,5 @@
 # Python
-__pycache__/
+*/__pycache__/*
 *.pyc
 .venv/
 venv/
@@ -10,6 +10,12 @@ venv/
 # Build artifacts
 *.ipa
 Payload/
+*.zip
+
+# macOS build/run scratch
+macos/.wda-src/
+macos/build/
+macos/.logs/
 
 # OS
 .DS_Store

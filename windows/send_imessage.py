@@ -23,6 +23,8 @@ from selenium.webdriver.support import expected_conditions as EC
 # You normally don't edit these by hand — start-gateway.ps1 auto-detects the UDID
 # and exports it. They only fall back to defaults for manual runs.
 APPIUM_SERVER = os.environ.get("APPIUM_SERVER", "http://127.0.0.1:4723")
+# Point at a prebuilt WDA (Windows/tidevice flow). Set to "" or "auto" to let Appium
+# build & manage WDA itself — that's what the macOS simulator/device flow uses.
 WDA_URL = os.environ.get("WDA_URL", "http://127.0.0.1:8100")
 IPHONE_UDID = os.environ.get("IPHONE_UDID", "")   # auto-detected: tidevice list --usb --one
 MESSAGES_BUNDLE_ID = "com.apple.MobileSMS"
@@ -46,7 +48,13 @@ def _make_driver() -> webdriver.Remote:
     opts.automation_name = "XCUITest"
     opts.udid = IPHONE_UDID
     opts.bundle_id = MESSAGES_BUNDLE_ID
-    opts.set_capability("webDriverAgentUrl", WDA_URL)
+    if WDA_URL and WDA_URL.lower() != "auto":
+        opts.set_capability("webDriverAgentUrl", WDA_URL)
+    # macOS + a real device with no prebuilt WDA: let Appium build & sign one.
+    team_id = os.environ.get("XCODE_TEAM_ID", "")
+    if team_id:
+        opts.set_capability("xcodeOrgId", team_id)
+        opts.set_capability("xcodeSigningId", "Apple Development")
     opts.set_capability("newCommandTimeout", 120)
     opts.set_capability("waitForIdleTimeout", 0)  # Messages animates a lot; don't over-wait
     return webdriver.Remote(APPIUM_SERVER, options=opts)

@@ -1,0 +1,7 @@
+# Installed into macos/.venv by setup.sh — not globally.
+# Needs Python 3.9–3.13.
+#
+# On macOS, Appium builds & manages WebDriverAgent itself (for the simulator or a
+# real device), so tidevice/wdaproxy from the Windows flow is NOT required here.
+Appium-Python-Client>=4.0.0
+Flask>=3.0.0

@@ -30,6 +30,23 @@ Everything is in one guide: **[windows/SETUP.md](windows/SETUP.md)**. Short vers
 
 Stuck? `.\setup.ps1 -VerifyOnly` tells you exactly what's missing.
 
+## 🍎 On a Mac (build & test locally, incl. the Simulator)
+
+Have a Mac with Xcode? You can skip the cloud build / Sideloadly entirely — everything
+builds locally. Full guide: **[macos/SETUP.md](macos/SETUP.md)**. Short version:
+
+```sh
+./macos/setup.sh                          # Node, Appium + XCUITest driver, Python venv
+./macos/run-sim.sh                        # test WebDriverAgent driving Messages in the Simulator
+./macos/start-gateway.sh --api-key "secret"   # full web UI + POST /send (sim, or --target device)
+```
+
+> The Simulator can't send a **real** iMessage (no account/cellular), so use it to exercise
+> the app + UI-driving + gateway. Real sending needs a physical iPhone
+> (`./macos/start-gateway.sh --target device --team-id <APPLE_TEAM_ID>`). The prebuilt
+> `Payload/…app` and `WebDriverAgent*.zip` here are **device** builds and won't launch in
+> the sim — `macos/build-wda-sim.sh` builds the simulator version.
+
 ## What's in the repo
 
 | Path | What it is |
@@ -42,6 +59,7 @@ Stuck? `.\setup.ps1 -VerifyOnly` tells you exactly what's missing.
 | [windows/send_imessage.py](windows/send_imessage.py) | Appium flow: open Messages → recipient → type → Send |
 | [windows/index.html](windows/index.html) | The browser UI |
 | [windows/SETUP.md](windows/SETUP.md) | **Full step-by-step guide** |
+| [macos/](macos/) | **Mac users start here** — local build + Simulator/device scripts ([macos/SETUP.md](macos/SETUP.md)) |
 | [shortcut/](shortcut/) | Bonus: iPhone-only "tap to open Messages" Shortcut |
 | [XCUITest/](XCUITest/) | Reference: the same automation as native Swift (needs a Mac to run) |
 
