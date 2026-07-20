@@ -69,12 +69,17 @@ Want a standalone simulator `.app` to inspect or install yourself?
 ./macos/start-gateway.sh --api-key "pick-a-secret"          # against the simulator
 ```
 
-Then open **http://localhost:5000**, enter the API key, a recipient, and a message.
+Then open **http://localhost:5001**, enter the API key, a recipient, and a message.
 `Ctrl-C` stops the server and the Appium instance this script started.
+
+> **Why 5001 and not 5000?** On macOS, port 5000 is held by the **AirPlay Receiver**, which
+> answers your browser with a **403** and blocks Flask from binding. The gateway defaults to
+> **5001**. Use `--port N` to change it, or turn AirPlay Receiver off in
+> System Settings ▸ General ▸ AirDrop & Handoff.
 
 Trigger it from anywhere:
 ```sh
-curl -X POST http://localhost:5000/send \
+curl -X POST http://localhost:5001/send \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: pick-a-secret" \
   -d '{"to":"Person X","message":"Hello from my Mac"}'
@@ -124,6 +129,7 @@ Windows flow and lives in [../windows/](../windows/) — it's plain, cross-platf
 | `Only the Command Line Tools are selected` | `sudo xcode-select -s /Applications/Xcode.app` |
 | Device build "installed" but won't launch in the sim | Expected — it's an `iphoneos` build. Use `run-sim.sh` / `build-wda-sim.sh` for a sim build. |
 | First `run-sim.sh` hangs for minutes | Normal — Appium is compiling WebDriverAgent for the simulator. Watch `macos/.logs/appium.log`. |
+| `Address already in use` / browser shows **403** at :5000 | Port 5000 is AirPlay Receiver. The gateway defaults to `--port 5001`; or disable AirPlay Receiver. Check with `lsof -iTCP:5000 -sTCP:LISTEN`. |
 | `--target device` fails to sign WDA | Pass a valid `--team-id`, or a `--wda-url` for an already-running WDA. |
 | No iPhone found for `--target device` | Plug in with a data cable, tap **Trust**, or pass `--udid` (find it: `xcrun xctrace list devices`). |
 | A send fails at compose/Send on a real device | Messages' labels vary by iOS version — read the real element name in **Appium Inspector** and update the constant in [../windows/send_imessage.py](../windows/send_imessage.py). |

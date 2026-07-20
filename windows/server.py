@@ -61,4 +61,6 @@ def send():
 
 if __name__ == "__main__":
     # 0.0.0.0 so another machine on your network (or an ngrok tunnel) can reach it.
-    app.run(host="0.0.0.0", port=5000)
+    # PORT is overridable — on macOS, port 5000 is taken by AirPlay Receiver.
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)

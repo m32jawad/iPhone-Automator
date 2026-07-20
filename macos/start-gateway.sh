@@ -8,10 +8,15 @@
 #   --target sim      (default) boot a simulator and run against it
 #   --target device   run against a connected, trusted iPhone
 #   --api-key KEY     shared secret for POST /send        (default: change-me)
+#   --port N          web UI / server port                 (default: 5001)
 #   --device NAME     simulator name for --target sim      (default: iPhone 17)
 #   --udid UDID       device UDID for --target device      (default: auto-detect)
 #   --team-id ID      Apple Team ID so Appium can sign WDA on a real device
 #   --wda-url URL     use an already-running WDA (e.g. http://127.0.0.1:8100)
+#
+# NOTE: the default port is 5001, not 5000 — on macOS, port 5000 is taken by the
+# AirPlay Receiver (System Settings > General > AirDrop & Handoff), which otherwise
+# answers your browser with a 403.
 #
 # Examples:
 #   ./macos/start-gateway.sh --api-key "s3cret"
@@ -27,6 +32,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"
 
 TARGET="sim"
 API_KEY="change-me"
+PORT="5001"
 DEVICE="iPhone 17"
 UDID=""
 TEAM_ID="${XCODE_TEAM_ID:-}"
@@ -36,11 +42,12 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --target)  TARGET="$2"; shift 2 ;;
     --api-key) API_KEY="$2"; shift 2 ;;
+    --port)    PORT="$2"; shift 2 ;;
     --device)  DEVICE="$2"; shift 2 ;;
     --udid)    UDID="$2"; shift 2 ;;
     --team-id) TEAM_ID="$2"; shift 2 ;;
     --wda-url) WDA_URL_OPT="$2"; shift 2 ;;
-    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -28; exit 0 ;;
+    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -32; exit 0 ;;
     *) die "Unknown flag: $1 (try --help)" ;;
   esac
 done
@@ -75,12 +82,21 @@ esac
 
 ensure_appium
 
+# --- make sure the web port is actually free (catches the AirPlay-on-5000 trap) --
+if lsof -iTCP:"$PORT" -sTCP:LISTEN -n -P >/dev/null 2>&1; then
+  holder="$(lsof -iTCP:"$PORT" -sTCP:LISTEN -n -P 2>/dev/null | awk 'NR==2{print $1}')"
+  warn "Port $PORT is already in use by '${holder:-another process}'."
+  [ "$PORT" = "5000" ] && warn "On macOS that's usually AirPlay Receiver — use --port 5001, or turn AirPlay Receiver off."
+  die "Pick a free port with --port N (e.g. --port 5001)."
+fi
+
 # --- launch the Flask gateway (foreground; Ctrl-C stops it, trap stops Appium) --
-msg "Starting the gateway server on http://localhost:5000  (api key: $API_KEY)"
+msg "Starting the gateway server on http://localhost:$PORT  (api key: $API_KEY)"
 echo ""
 cd "$REPO_DIR/windows"
 IPHONE_UDID="$UDID" \
 API_KEY="$API_KEY" \
+PORT="$PORT" \
 APPIUM_SERVER="$APPIUM_URL" \
 WDA_URL="$WDA_URL" \
 XCODE_TEAM_ID="$TEAM_ID" \
