@@ -132,4 +132,5 @@ Windows flow and lives in [../windows/](../windows/) — it's plain, cross-platf
 | `Address already in use` / browser shows **403** at :5000 | Port 5000 is AirPlay Receiver. The gateway defaults to `--port 5001`; or disable AirPlay Receiver. Check with `lsof -iTCP:5000 -sTCP:LISTEN`. |
 | `--target device` fails to sign WDA | Pass a valid `--team-id`, or a `--wda-url` for an already-running WDA. |
 | No iPhone found for `--target device` | Plug in with a data cable, tap **Trust**, or pass `--udid` (find it: `xcrun xctrace list devices`). |
-| A send fails at compose/Send on a real device | Messages' labels vary by iOS version — read the real element name in **Appium Inspector** and update the constant in [../windows/send_imessage.py](../windows/send_imessage.py). |
+| `500` on `/send` in the sim: "Send is disabled…" | Expected. The automation opens the message and types it, but the sim has **no SMS/iMessage service**, so iOS greys out the Send button. Real sending needs a physical iPhone. |
+| A send fails at typing/Send on a real device | The sender opens the message via the `sms:` deep link, then taps `messageBodyField` / `sendButton`. If a label changed, read the real element name in **Appium Inspector** and update the constant in [../windows/send_imessage.py](../windows/send_imessage.py). |

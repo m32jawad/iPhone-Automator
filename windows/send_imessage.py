@@ -3,21 +3,22 @@ Appium flow: open Messages -> new message -> type recipient -> type body -> Send
 
 Runs on Windows. Talks over a socket to WebDriverAgent on the iPhone via Appium.
 
-NOTE ON SELECTORS: Apple changes Messages' internal accessibility labels between
-iOS versions. If a step can't find an element, open **Appium Inspector**, tap the
-element, read its real `name`/`label`, and update the constant below. Every selector
-here has a comment marking what to check.
+HOW IT ADDRESSES A RECIPIENT: iOS 26's Messages removed the tappable "compose"
+button, so we open a new message with the `sms:` URL scheme instead — that's stable
+across iOS versions. We then only need the body field and the Send button.
+
+NOTE ON SELECTORS: if a step can't find an element, open **Appium Inspector**, tap
+the element, read its real `name`/`label`, and update the constant below.
 """
 
 from __future__ import annotations
 
 import os
 import time
+from urllib.parse import quote
 from appium import webdriver
 from appium.options.ios import XCUITestOptions
 from appium.webdriver.common.appiumby import AppiumBy
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # --- connection settings (read from environment; start-gateway.ps1 sets these) ---
 # You normally don't edit these by hand — start-gateway.ps1 auto-detects the UDID
@@ -29,11 +30,9 @@ WDA_URL = os.environ.get("WDA_URL", "http://127.0.0.1:8100")
 IPHONE_UDID = os.environ.get("IPHONE_UDID", "")   # auto-detected: tidevice list --usb --one
 MESSAGES_BUNDLE_ID = "com.apple.MobileSMS"
 
-# --- selectors to verify in Appium Inspector if a step fails ------------------
-COMPOSE_BTN = "compose"                     # the "new message" pencil icon (top-right)
-TO_FIELD_PLACEHOLDER = "To:"                # the recipient field
-BODY_FIELD_NAMES = ("iMessage", "Text Message")  # message text box placeholder
-SEND_BTN = "Send"                           # the up-arrow send button
+# --- selectors (verified on iOS 26; older iOS covered by the fallbacks below) -
+BODY_FIELD_ID = "messageBodyField"          # the message text box (a11y id; label "Message")
+SEND_BTN_ID = "sendButton"                  # the blue up-arrow send button (a11y id; label "Send")
 
 
 def _make_driver() -> webdriver.Remote:
@@ -60,8 +59,8 @@ def _make_driver() -> webdriver.Remote:
     return webdriver.Remote(APPIUM_SERVER, options=opts)
 
 
-def _tap_first(driver, locators, timeout=10):
-    """Try several (by, value) locators; tap the first that appears."""
+def _find_first(driver, locators, timeout=10):
+    """Return the first of several (by, value) locators that appears (no click)."""
     end = time.time() + timeout
     last_err = None
     while time.time() < end:
@@ -69,7 +68,6 @@ def _tap_first(driver, locators, timeout=10):
             try:
                 el = driver.find_element(by, value)
                 if el.is_displayed():
-                    el.click()
                     return el
             except Exception as e:  # noqa: BLE001 - broad on purpose, we retry
                 last_err = e
@@ -77,45 +75,49 @@ def _tap_first(driver, locators, timeout=10):
     raise TimeoutError(f"None of these appeared in {timeout}s: {locators} ({last_err})")
 
 
+def _tap_first(driver, locators, timeout=10):
+    """Tap the first of several (by, value) locators that appears."""
+    el = _find_first(driver, locators, timeout)
+    el.click()
+    return el
+
+
 def send_imessage(recipient: str, message: str) -> None:
-    """Open Messages and send `message` to `recipient` (name, phone, or email)."""
+    """Open Messages and send `message` to `recipient` (phone number or email).
+
+    Contact *names* are less reliable than a number/address, since the sms: scheme
+    addresses by phone/email — prefer those.
+    """
     driver = _make_driver()
     try:
-        wait = WebDriverWait(driver, 15)
+        # 1) Open a fresh compose addressed to `recipient` via the sms: URL scheme.
+        #    (iOS 26 removed the tappable compose button; this works on every iOS.)
+        driver.execute_script("mobile: deepLink", {
+            "url": "sms:" + quote(recipient),
+            "bundleId": MESSAGES_BUNDLE_ID,
+        })
 
-        # 1) New message.
-        _tap_first(driver, [
-            (AppiumBy.ACCESSIBILITY_ID, COMPOSE_BTN),
-            (AppiumBy.IOS_PREDICATE, "name == 'compose' OR label == 'New Message'"),
-        ])
-
-        # 2) Recipient -> type, then pick the first suggestion.
-        to_field = wait.until(EC.presence_of_element_located(
-            (AppiumBy.IOS_PREDICATE,
-             f"value CONTAINS '{TO_FIELD_PLACEHOLDER}' OR name CONTAINS '{TO_FIELD_PLACEHOLDER}'")
-        ))
-        to_field.click()
-        to_field.send_keys(recipient)
-        time.sleep(1.2)  # let contact suggestions populate
-        # Tap the first matching suggestion cell (falls back to the field itself).
-        try:
-            driver.find_elements(AppiumBy.CLASS_NAME, "XCUIElementTypeCell")[0].click()
-        except Exception:  # noqa: BLE001
-            pass
-
-        # 3) Message body.
+        # 2) Type the message into the body field.
         body = _tap_first(driver, [
+            (AppiumBy.ACCESSIBILITY_ID, BODY_FIELD_ID),
             (AppiumBy.IOS_PREDICATE,
-             " OR ".join(f"value == '{n}'" for n in BODY_FIELD_NAMES)),
+             "label == 'Message' OR value == 'iMessage' OR value == 'Text Message'"),
             (AppiumBy.CLASS_NAME, "XCUIElementTypeTextView"),
-        ])
+        ], timeout=15)
         body.send_keys(message)
 
-        # 4) Send.
-        _tap_first(driver, [
-            (AppiumBy.ACCESSIBILITY_ID, SEND_BTN),
-            (AppiumBy.IOS_PREDICATE, f"name == '{SEND_BTN}' OR label == '{SEND_BTN}'"),
-        ])
+        # 3) Tap Send (the blue up-arrow). If it's disabled, the recipient can't be
+        #    reached from here — e.g. the iOS Simulator has no SMS/iMessage service.
+        send_btn = _find_first(driver, [
+            (AppiumBy.ACCESSIBILITY_ID, SEND_BTN_ID),
+            (AppiumBy.IOS_PREDICATE, "name == 'sendButton' OR label == 'Send'"),
+        ], timeout=10)
+        if (send_btn.get_attribute("enabled") or "").lower() == "false":
+            raise RuntimeError(
+                "Send is disabled — the recipient can't receive a message here. "
+                "The iOS Simulator has no SMS/iMessage service; use a real iPhone."
+            )
+        send_btn.click()
 
         time.sleep(1.0)  # let it fire off
     finally:
