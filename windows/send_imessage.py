@@ -54,6 +54,12 @@ def _make_driver() -> webdriver.Remote:
     if team_id:
         opts.set_capability("xcodeOrgId", team_id)
         opts.set_capability("xcodeSigningId", "Apple Development")
+        # WDA's stock bundle id (com.facebook.WebDriverAgentRunner) is already
+        # registered to another team, so a fresh team can't sign it. Build under a
+        # unique id instead. Overridable via WDA_BUNDLE_ID (start-gateway.sh flag).
+        wda_bundle_id = os.environ.get("WDA_BUNDLE_ID", "")
+        if wda_bundle_id:
+            opts.set_capability("updatedWDABundleId", wda_bundle_id)
     opts.set_capability("newCommandTimeout", 120)
     opts.set_capability("waitForIdleTimeout", 0)  # Messages animates a lot; don't over-wait
     return webdriver.Remote(APPIUM_SERVER, options=opts)
@@ -120,6 +126,14 @@ def send_imessage(recipient: str, message: str) -> None:
         send_btn.click()
 
         time.sleep(1.0)  # let it fire off
+
+        # Leave the phone on the Home screen. Otherwise quitting terminates
+        # Messages and the phone is left sitting on WebDriverAgent's own
+        # "Automation Running" screen instead of returning to normal.
+        try:
+            driver.execute_script("mobile: pressButton", {"name": "home"})
+        except Exception:  # noqa: BLE001 - cosmetic; a sent message must not fail here
+            pass
     finally:
         driver.quit()
 

@@ -13,6 +13,9 @@
 #   --udid UDID       device UDID for --target device      (default: auto-detect)
 #   --team-id ID      Apple Team ID so Appium can sign WDA on a real device
 #   --wda-url URL     use an already-running WDA (e.g. http://127.0.0.1:8100)
+#   --wda-bundle-id B unique bundle id to build WDA under on a real device
+#                     (default: com.imessagegateway.WebDriverAgentRunner — the stock
+#                      com.facebook.* id is already registered to another team)
 #
 # NOTE: the default port is 5001, not 5000 — on macOS, port 5000 is taken by the
 # AirPlay Receiver (System Settings > General > AirDrop & Handoff), which otherwise
@@ -37,6 +40,7 @@ DEVICE="iPhone 17"
 UDID=""
 TEAM_ID="${XCODE_TEAM_ID:-}"
 WDA_URL_OPT=""
+WDA_BUNDLE_ID=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,6 +51,7 @@ while [ $# -gt 0 ]; do
     --udid)    UDID="$2"; shift 2 ;;
     --team-id) TEAM_ID="$2"; shift 2 ;;
     --wda-url) WDA_URL_OPT="$2"; shift 2 ;;
+    --wda-bundle-id) WDA_BUNDLE_ID="$2"; shift 2 ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//' | head -32; exit 0 ;;
     *) die "Unknown flag: $1 (try --help)" ;;
   esac
@@ -76,6 +81,10 @@ case "$TARGET" in
     WDA_URL="${WDA_URL_OPT:-auto}"
     [ -z "$TEAM_ID" ] && [ "$WDA_URL" = "auto" ] && \
       warn "No --team-id and no --wda-url: Appium may fail to sign WDA. Pass one of them if it does."
+    # Only sign under a unique WDA bundle id when Appium builds WDA itself.
+    if [ "$WDA_URL" = "auto" ]; then
+      WDA_BUNDLE_ID="${WDA_BUNDLE_ID:-com.imessagegateway.WebDriverAgentRunner}"
+    fi
     ;;
   *) die "--target must be 'sim' or 'device'." ;;
 esac
@@ -100,4 +109,5 @@ PORT="$PORT" \
 APPIUM_SERVER="$APPIUM_URL" \
 WDA_URL="$WDA_URL" \
 XCODE_TEAM_ID="$TEAM_ID" \
+WDA_BUNDLE_ID="$WDA_BUNDLE_ID" \
   "$VENV_PY" server.py
